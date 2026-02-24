@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  mdpdf:
+    build: .
+    image: mdpdf:latest
+    container_name: mdpdf
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - DEBUG=false
+    restart: unless-stopped
+    # Read-only filesystem — no server-side storage
+    read_only: true
+    tmpfs:
+      - /tmp
