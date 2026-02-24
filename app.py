@@ -88,8 +88,8 @@ def derive_palette(bg_hex, fg_hex, accent_hex):
 
 
 # ── ReportLab style builder ──────────────────────────────────────────────────
-def build_styles(p, fs, font_body="Times-Roman", font_head="Helvetica-Bold"):
-    """Build all paragraph styles for a given palette and font size."""
+def build_styles(p, fs, hfs=1.0, font_body="Times-Roman", font_head="Helvetica-Bold"):
+    """Build all paragraph styles for a given palette, font size, and heading multiplier."""
     base = dict(fontName=font_body, textColor=p["fg"], leading=fs * 1.6)
     return {
         "body": ParagraphStyle(
@@ -98,7 +98,7 @@ def build_styles(p, fs, font_body="Times-Roman", font_head="Helvetica-Bold"):
         "h1": ParagraphStyle(
             "h1",
             fontName=font_head,
-            fontSize=fs * 1.85,
+            fontSize=fs * 1.85 * hfs,
             textColor=p["accent"],
             spaceAfter=fs * 0.3,
             spaceBefore=fs * 1.1,
@@ -107,7 +107,7 @@ def build_styles(p, fs, font_body="Times-Roman", font_head="Helvetica-Bold"):
         "h2": ParagraphStyle(
             "h2",
             fontName=font_head,
-            fontSize=fs * 1.45,
+            fontSize=fs * 1.45 * hfs,
             textColor=p["accent"],
             spaceAfter=fs * 0.25,
             spaceBefore=fs * 0.9,
@@ -116,7 +116,7 @@ def build_styles(p, fs, font_body="Times-Roman", font_head="Helvetica-Bold"):
         "h3": ParagraphStyle(
             "h3",
             fontName=font_head,
-            fontSize=fs * 1.15,
+            fontSize=fs * 1.15 * hfs,
             textColor=p["fg"],
             spaceAfter=fs * 0.2,
             spaceBefore=fs * 0.7,
@@ -125,7 +125,7 @@ def build_styles(p, fs, font_body="Times-Roman", font_head="Helvetica-Bold"):
         "h4": ParagraphStyle(
             "h4",
             fontName=font_head + "-Oblique" if font_head == "Helvetica" else font_head,
-            fontSize=fs,
+            fontSize=fs * hfs,
             textColor=p["fg"],
             spaceAfter=fs * 0.2,
             spaceBefore=fs * 0.5,
@@ -444,6 +444,7 @@ def build_pdf(md_text, settings):
     scheme_text = settings.get("scheme_text", "") or "#1a1a2e"
     accent_hex = settings.get("accent", "#d4a017")
     font_size = float(settings.get("font_size", 13))
+    heading_font_size = float(settings.get("heading_font_size", 1.0))
     page_key = settings.get("page_size", "A4")
     orientation = settings.get("orientation", "portrait")
     m_top = float(settings.get("m_top", 20))
@@ -482,7 +483,7 @@ def build_pdf(md_text, settings):
     p = derive_palette(scheme_bg, scheme_text, accent_hex)
 
     # ── Styles ──────────────────────────────────────────────────────
-    st = build_styles(p, font_size, font_body, font_head)
+    st = build_styles(p, font_size, heading_font_size, font_body, font_head)
 
     # ── Background painter (called every page) ───────────────────────
     def paint_bg(canvas_obj, doc):
@@ -521,10 +522,22 @@ TEMPLATE = r"""<!DOCTYPE html>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/display/fullscreen.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/matchesonscrollbar.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/matchesonscrollbar.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/continuelist.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/display/fullscreen.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/search.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/matchesonscrollbar.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/search.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/matchesonscrollbar.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 <style>
 :root{
@@ -597,6 +610,9 @@ input[type=color]{width:32px;height:26px;border:none;background:none;cursor:poin
 .tb{background:none;border:none;color:var(--muted);font-family:var(--font-ui);
     font-size:.63rem;padding:3px 7px;border-radius:4px;cursor:pointer;transition:all .12s}
 .tb:hover{background:var(--panel);color:var(--accent)}
+.CodeMirror-dialog{background:var(--panel);border:1px solid var(--border);color:var(--text);font-family:var(--font-ui)}
+.CodeMirror-search-hint{color:var(--muted)}
+.CodeMirror-searchfield{background:var(--surface);color:var(--text);border:1px solid var(--border);font-family:var(--font-ui)}
 .ts{width:1px;background:var(--border);margin:0 3px}
 .ewrap{flex:1;overflow:hidden}
 .CodeMirror{height:100%!important;font-size:.77rem!important;line-height:1.65!important;
@@ -715,6 +731,9 @@ body.fs-active #exitFullscreenBtn{display:inline-block!important}
 
     <!-- Style -->
     <div class="spanel" id="sp-style">
+      <div class="sl">Heading font size: <span id="hfsv">1.0x</span></div>
+      <input class="if" type="range" id="headingFontSize" min="0.8" max="1.5" step="0.05" value="1.0"
+        oninput="document.getElementById('hfsv').textContent=(+this.value).toFixed(2)+'x'; refreshPreview()"/>
       <div class="sl">Body font</div>
       <select class="if" id="fontBody" onchange="refreshPreview()">
         <option value="Georgia, serif">Georgia (Serif)</option>
@@ -836,6 +855,8 @@ body.fs-active #exitFullscreenBtn{display:inline-block!important}
       <button class="tb" onclick="insBlock()">{ }</button>
       <button class="tb" onclick="insLink()">🔗</button>
       <button class="tb" onclick="insTable()">⊞</button>
+      <div class="ts"></div>
+      <button class="tb" onclick="openFind()">🔍 Find</button><button class="tb" onclick="openReplace()">↻ Replace</button>
     </div>
     <div class="ewrap"><textarea id="mdEditor"></textarea></div>
   </section>
@@ -892,6 +913,7 @@ function refreshPreview() {
   const fh  = document.getElementById('fontHead').value;
   const acc = document.getElementById('accentColor').value;
   const pad = document.getElementById('pagePad').value;
+  const hfs = parseFloat(document.getElementById('headingFontSize').value) || 1.0;
 
   const bg = schemeBg || '#ffffff';
   const fg = schemeText || '#1a1a2e';
@@ -925,9 +947,10 @@ function refreshPreview() {
   if (!ds) { ds = document.createElement('style'); ds.id='dyn-style'; document.head.appendChild(ds); }
   ds.textContent =
     '#preview h1,#preview h2,#preview h3,#preview h4{font-family:'+fh+';color:'+acc+'}' +
-    '#preview h1{border-bottom:2px solid '+acc+'}' +
-    '#preview h2{border-bottom:1px solid '+acc+'88}' +
-    '#preview h3,#preview h4{border-bottom:none}' +
+    '#preview h1{font-size:'+((fs*1.85)*hfs)+'px;border-bottom:2px solid '+acc+'}' +
+    '#preview h2{font-size:'+((fs*1.45)*hfs)+'px;border-bottom:1px solid '+acc+'88}' +
+    '#preview h3{font-size:'+((fs*1.15)*hfs)+'px}' +
+    '#preview h4{font-size:'+((fs)*hfs)+'px}' +
     '#preview p,#preview li,#preview td{color:'+fg+'}' +
     '#preview a{color:'+link+'}' +
     '#preview code{background-color:'+codeBg+'!important;color:'+codeFg+'!important;border-radius:3px}' +
@@ -1071,6 +1094,7 @@ async function exportPDF() {
     meta_author: document.getElementById('metaAuthor').value,
     scheme_bg:   schemeBg,
     scheme_text: schemeText,
+    heading_font_size: document.getElementById('headingFontSize').value,
   };
   try {
     const res = await fetch('/export', {
@@ -1094,6 +1118,9 @@ async function exportPDF() {
     toast('Export failed: '+e.message,'err'); setStatus('Error'); console.error(e);
   } finally { setLoading(false); }
 }
+
+function openFind(){cm.execCommand('find')}
+function openReplace(){cm.execCommand('replace')}
 
 function setLoading(v){document.getElementById('overlay').classList.toggle('on',v)}
 function setStatus(t,busy=false){document.getElementById('stxt').textContent=t;document.getElementById('sdot').classList.toggle('busy',busy)}
