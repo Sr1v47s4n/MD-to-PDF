@@ -27,7 +27,7 @@ from reportlab.platypus import (
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_LEFT, TA_JUSTIFY
+from reportlab.lib.enums import TA_LEFT, TA_JUSTIFY, TA_CENTER, TA_RIGHT
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
@@ -88,48 +88,72 @@ def derive_palette(bg_hex, fg_hex, accent_hex):
 
 
 # ── ReportLab style builder ──────────────────────────────────────────────────
-def build_styles(p, fs, hfs=1.0, font_body="Times-Roman", font_head="Helvetica-Bold"):
-    """Build all paragraph styles for a given palette, font size, and heading multiplier."""
-    base = dict(fontName=font_body, textColor=p["fg"], leading=fs * 1.6)
+def build_styles(
+    p,
+    fs,
+    hfs=1.0,
+    text_align="left",
+    section_pad=16,
+    font_body="Times-Roman",
+    font_head="Helvetica-Bold",
+):
+    """Build all paragraph styles for a given palette, font size, heading multiplier, alignment, and section padding."""
+    # Map text alignment
+    align_map = {
+        "left": TA_LEFT,
+        "center": TA_CENTER,
+        "right": TA_RIGHT,
+        "justify": TA_JUSTIFY,
+    }
+    alignment = align_map.get(text_align, TA_LEFT)
+
+    # Convert section padding to points (1mm ≈ 2.83pt)
+    sp_pt = float(section_pad) * 2.83
+
+    base = dict(
+        fontName=font_body, textColor=p["fg"], leading=fs * 1.6, alignment=alignment
+    )
     return {
-        "body": ParagraphStyle(
-            "body", fontSize=fs, spaceAfter=fs * 0.65, alignment=TA_JUSTIFY, **base
-        ),
+        "body": ParagraphStyle("body", fontSize=fs, spaceAfter=fs * 0.65, **base),
         "h1": ParagraphStyle(
             "h1",
             fontName=font_head,
             fontSize=fs * 1.85 * hfs,
             textColor=p["accent"],
-            spaceAfter=fs * 0.3,
-            spaceBefore=fs * 1.1,
+            spaceAfter=sp_pt * 0.3,
+            spaceBefore=sp_pt * 0.7,
             leading=fs * 2.3,
+            alignment=alignment,
         ),
         "h2": ParagraphStyle(
             "h2",
             fontName=font_head,
             fontSize=fs * 1.45 * hfs,
             textColor=p["accent"],
-            spaceAfter=fs * 0.25,
-            spaceBefore=fs * 0.9,
+            spaceAfter=sp_pt * 0.25,
+            spaceBefore=sp_pt * 0.6,
             leading=fs * 1.85,
+            alignment=alignment,
         ),
         "h3": ParagraphStyle(
             "h3",
             fontName=font_head,
             fontSize=fs * 1.15 * hfs,
             textColor=p["fg"],
-            spaceAfter=fs * 0.2,
-            spaceBefore=fs * 0.7,
+            spaceAfter=sp_pt * 0.2,
+            spaceBefore=sp_pt * 0.5,
             leading=fs * 1.55,
+            alignment=alignment,
         ),
         "h4": ParagraphStyle(
             "h4",
             fontName=font_head + "-Oblique" if font_head == "Helvetica" else font_head,
             fontSize=fs * hfs,
             textColor=p["fg"],
-            spaceAfter=fs * 0.2,
-            spaceBefore=fs * 0.5,
+            spaceAfter=sp_pt * 0.15,
+            spaceBefore=sp_pt * 0.4,
             leading=fs * 1.4,
+            alignment=alignment,
         ),
         "code": ParagraphStyle(
             "code",
@@ -141,6 +165,7 @@ def build_styles(p, fs, hfs=1.0, font_body="Times-Roman", font_head="Helvetica-B
             rightIndent=5,
             spaceAfter=2,
             leading=fs * 1.2,
+            alignment=alignment,
         ),
         "pre": ParagraphStyle(
             "pre",
@@ -152,6 +177,7 @@ def build_styles(p, fs, hfs=1.0, font_body="Times-Roman", font_head="Helvetica-B
             rightIndent=10,
             spaceAfter=fs * 0.55,
             leading=fs * 1.25,
+            alignment=alignment,
         ),
         "bq": ParagraphStyle(
             "bq",
@@ -163,6 +189,7 @@ def build_styles(p, fs, hfs=1.0, font_body="Times-Roman", font_head="Helvetica-B
             rightIndent=8,
             spaceAfter=fs * 0.5,
             leading=fs * 1.55,
+            alignment=alignment,
         ),
         "li": ParagraphStyle(
             "li",
@@ -172,6 +199,7 @@ def build_styles(p, fs, hfs=1.0, font_body="Times-Roman", font_head="Helvetica-B
             leading=fs * 1.5,
             leftIndent=0,
             spaceAfter=fs * 0.18,
+            alignment=alignment,
         ),
     }
 
@@ -445,6 +473,8 @@ def build_pdf(md_text, settings):
     accent_hex = settings.get("accent", "#d4a017")
     font_size = float(settings.get("font_size", 13))
     heading_font_size = float(settings.get("heading_font_size", 1.0))
+    text_align = settings.get("text_align", "left")
+    section_pad = float(settings.get("section_pad", 16))
     page_key = settings.get("page_size", "A4")
     orientation = settings.get("orientation", "portrait")
     m_top = float(settings.get("m_top", 20))
@@ -483,7 +513,9 @@ def build_pdf(md_text, settings):
     p = derive_palette(scheme_bg, scheme_text, accent_hex)
 
     # ── Styles ──────────────────────────────────────────────────────
-    st = build_styles(p, font_size, heading_font_size, font_body, font_head)
+    st = build_styles(
+        p, font_size, heading_font_size, text_align, section_pad, font_body, font_head
+    )
 
     # ── Background painter (called every page) ───────────────────────
     def paint_bg(canvas_obj, doc):
@@ -552,7 +584,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-ui);
      min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden}
 header{background:var(--surface);border-bottom:1px solid var(--border);
        padding:11px 22px;display:flex;align-items:center;gap:14px;
-       position:sticky;top:0;z-index:100}
+       position:fixed;top:0;left:0;right:0;z-index:100}
 .logo{font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--accent);white-space:nowrap}
 .logo span{color:var(--accent2)}
 .tagline{font-size:.62rem;color:var(--muted);border-left:1px solid var(--border);padding-left:11px}
@@ -564,10 +596,10 @@ header{background:var(--surface);border-bottom:1px solid var(--border);
 .btn:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
 .btn-p{background:var(--accent);color:#0d0f12;border-color:var(--accent)}
 .btn-p:hover{background:#f0d898;color:#0d0f12}
-.workspace{flex:1;display:grid;grid-template-columns:295px 1fr 1fr;
-           height:calc(100vh - 51px);overflow:hidden}
+.workspace{flex:1;display:grid;grid-template-columns:1fr 1fr;
+           height:calc(100vh - 51px);overflow:hidden;margin-top:51px;padding-left:295px}
 .sidebar{background:var(--surface);border-right:1px solid var(--border);
-         display:flex;flex-direction:column;overflow:hidden}
+         display:flex;flex-direction:column;overflow:hidden;position:fixed;left:0;top:51px;height:calc(100vh - 51px);width:295px;z-index:99}
 .stabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
 .stab{flex:1;padding:9px 2px;font-size:.58rem;text-align:center;text-transform:uppercase;
       letter-spacing:.07em;cursor:pointer;color:var(--muted);
@@ -599,14 +631,14 @@ input[type=color]{width:32px;height:26px;border:none;background:none;cursor:poin
 .pc:hover{border-color:var(--accent);color:var(--accent)}
 .pc strong{display:block;color:var(--text);margin-bottom:2px;font-size:.63rem}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.epane{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
+.epane{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden;height:100%}
 .phdr{background:var(--surface);border-bottom:1px solid var(--border);padding:7px 11px;
       font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);
-      display:flex;align-items:center;gap:7px;flex-shrink:0}
+      display:flex;align-items:center;gap:7px;flex:0 0 auto;z-index:50}
 .pt{color:var(--accent2);font-weight:600}
 .pa{margin-left:auto;display:flex;gap:5px}
 .tbar{display:flex;gap:3px;padding:5px 7px;background:var(--surface);
-      border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0}
+      border-bottom:1px solid var(--border);flex-wrap:wrap;flex:0 0 auto;z-index:50}
 .tb{background:none;border:none;color:var(--muted);font-family:var(--font-ui);
     font-size:.63rem;padding:3px 7px;border-radius:4px;cursor:pointer;transition:all .12s}
 .tb:hover{background:var(--panel);color:var(--accent)}
@@ -614,15 +646,15 @@ input[type=color]{width:32px;height:26px;border:none;background:none;cursor:poin
 .CodeMirror-search-hint{color:var(--muted)}
 .CodeMirror-searchfield{background:var(--surface);color:var(--text);border:1px solid var(--border);font-family:var(--font-ui)}
 .ts{width:1px;background:var(--border);margin:0 3px}
-.ewrap{flex:1;overflow:hidden}
+.ewrap{flex:1 1 0;overflow:hidden;min-height:0}
 .CodeMirror{height:100%!important;font-size:.77rem!important;line-height:1.65!important;
             font-family:var(--font-ui)!important;background:var(--bg)!important}
 .CodeMirror-scroll{padding-bottom:60px}
 .CodeMirror-fullscreen{position:fixed!important;top:51px!important;left:0!important;right:0!important;bottom:0!important;height:auto!important;z-index:100}
 .CodeMirror-fullscreen ~ .phdr,.CodeMirror-fullscreen ~ .tbar{display:none}
 body.fs-active #exitFullscreenBtn{display:inline-block!important}
-.ppane{display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
-.pscroll{flex:1;overflow-y:auto;padding:22px}
+.ppane{display:flex;flex-direction:column;overflow:hidden;background:var(--bg);height:100%;padding:2px;}
+.pscroll{flex:1 1 0;overflow-y:auto;min-height:0}
 
 /* Preview paper */
 #preview{
@@ -764,6 +796,16 @@ body.fs-active #exitFullscreenBtn{display:inline-block!important}
       <div class="sl">Page padding: <span id="ppv">48px</span></div>
       <input class="if" type="range" id="pagePad" min="16" max="96" value="48"
         oninput="document.getElementById('ppv').textContent=this.value+'px'; refreshPreview()"/>
+      <div class="sl">Text alignment</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px">
+        <button class="tb" id="alignLeft" style="padding:6px 8px;border:1px solid var(--border)" onclick="setAlign('left')">⬅ Left</button>
+        <button class="tb" id="alignCenter" style="padding:6px 8px;border:1px solid var(--border)" onclick="setAlign('center')">⬇ Center</button>
+        <button class="tb" id="alignRight" style="padding:6px 8px;border:1px solid var(--border)" onclick="setAlign('right')">➡ Right</button>
+        <button class="tb" id="alignJustify" style="padding:6px 8px;border:1px solid var(--border)" onclick="setAlign('justify')">⬍ Justify</button>
+      </div>
+      <div class="sl">Section padding: <span id="spv">16px</span></div>
+      <input class="if" type="range" id="sectionPad" min="4" max="32" step="2" value="16"
+        oninput="document.getElementById('spv').textContent=this.value+'px'; refreshPreview()"/>
       <div class="sl">Color scheme</div>
       <div class="pgrid">
         <div class="pc" onclick="applyScheme('classic')"><strong>Classic</strong>White / dark</div>
@@ -900,7 +942,20 @@ cm.on('optionChange', (inst, option) => {
   }
 });
 
-let schemeBg = '', schemeText = '';
+let schemeBg = '', schemeText = '', currentAlign = 'left';
+
+// ── Text alignment ──────────────────────────────────────────────────────────
+function setAlign(align) {
+  currentAlign = align;
+  ['left', 'center', 'right', 'justify'].forEach(a => {
+    document.getElementById('align' + (a==='left'?'Left':a==='center'?'Center':a==='right'?'Right':'Justify'))
+      .style.borderColor = a === align ? 'var(--accent)' : 'var(--border)';
+    document.getElementById('align' + (a==='left'?'Left':a==='center'?'Center':a==='right'?'Right':'Justify'))
+      .style.color = a === align ? 'var(--accent)' : 'var(--muted)';
+  });
+  refreshPreview();
+}
+setAlign('left');
 
 // ── refreshPreview ──────────────────────────────────────────────────────────
 function refreshPreview() {
@@ -914,6 +969,7 @@ function refreshPreview() {
   const acc = document.getElementById('accentColor').value;
   const pad = document.getElementById('pagePad').value;
   const hfs = parseFloat(document.getElementById('headingFontSize').value) || 1.0;
+  const sp  = document.getElementById('sectionPad').value;
 
   const bg = schemeBg || '#ffffff';
   const fg = schemeText || '#1a1a2e';
@@ -939,7 +995,7 @@ function refreshPreview() {
     'font-family:'+fb, 'font-size:'+fs+'px', 'line-height:'+lh,
     'padding:'+pad+'px', 'background-color:'+bg, 'color:'+fg,
     'max-width:710px', 'margin:0 auto', 'border-radius:3px',
-    'box-shadow:0 8px 32px rgba(0,0,0,.45)', 'min-height:880px'
+    'box-shadow:0 8px 32px rgba(0,0,0,.45)', 'min-height:880px', 'text-align:'+currentAlign
   ].join(';');
 
   // Scoped dynamic styles
@@ -947,16 +1003,17 @@ function refreshPreview() {
   if (!ds) { ds = document.createElement('style'); ds.id='dyn-style'; document.head.appendChild(ds); }
   ds.textContent =
     '#preview h1,#preview h2,#preview h3,#preview h4{font-family:'+fh+';color:'+acc+'}' +
-    '#preview h1{font-size:'+((fs*1.85)*hfs)+'px;border-bottom:2px solid '+acc+'}' +
-    '#preview h2{font-size:'+((fs*1.45)*hfs)+'px;border-bottom:1px solid '+acc+'88}' +
-    '#preview h3{font-size:'+((fs*1.15)*hfs)+'px}' +
-    '#preview h4{font-size:'+((fs)*hfs)+'px}' +
-    '#preview p,#preview li,#preview td{color:'+fg+'}' +
+    '#preview h1,#preview h2,#preview h3,#preview h4{text-align:'+currentAlign+'}' +
+    '#preview h1{font-size:'+((fs*1.85)*hfs)+'px;border-bottom:2px solid '+acc+';margin-top:'+sp*1.5+'px;margin-bottom:'+sp+'px}' +
+    '#preview h2{font-size:'+((fs*1.45)*hfs)+'px;border-bottom:1px solid '+acc+'88;margin-top:'+sp*1.2+'px;margin-bottom:'+sp*0.8+'px}' +
+    '#preview h3{font-size:'+((fs*1.15)*hfs)+'px;margin-top:'+sp+'px;margin-bottom:'+sp*0.6+'px}' +
+    '#preview h4{font-size:'+((fs)*hfs)+'px;margin-top:'+sp*0.8+'px;margin-bottom:'+sp*0.5+'px}' +
+    '#preview p,#preview li,#preview td{color:'+fg+';text-align:'+currentAlign+'}' +
     '#preview a{color:'+link+'}' +
     '#preview code{background-color:'+codeBg+'!important;color:'+codeFg+'!important;border-radius:3px}' +
-    '#preview pre{background-color:'+preBg+'!important;color:#f8f8f2!important;border-radius:6px}' +
+    '#preview pre{background-color:'+preBg+'!important;color:#f8f8f2!important;border-radius:6px;text-align:'+currentAlign+'}' +
     '#preview pre code{background-color:transparent!important;color:#f8f8f2!important}' +
-    '#preview blockquote{border-left:4px solid '+acc+';background-color:'+bqBg+';color:'+bqFg+';border-radius:0 4px 4px 0}' +
+    '#preview blockquote{border-left:4px solid '+acc+';background-color:'+bqBg+';color:'+bqFg+';border-radius:0 4px 4px 0;text-align:'+currentAlign+'}' +
     '#preview table{width:100%;border-collapse:collapse}' +
     '#preview th{background-color:'+thBg+';color:'+fg+';border:1px solid '+border+';padding:6px 10px}' +
     '#preview td{background-color:'+bg+';color:'+fg+';border:1px solid '+border+';padding:6px 10px}' +
@@ -1095,6 +1152,8 @@ async function exportPDF() {
     scheme_bg:   schemeBg,
     scheme_text: schemeText,
     heading_font_size: document.getElementById('headingFontSize').value,
+    text_align:  currentAlign,
+    section_pad: document.getElementById('sectionPad').value,
   };
   try {
     const res = await fetch('/export', {
